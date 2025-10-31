@@ -41,3 +41,41 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
       DYNAMIC_CONFIG_ENABLED: "true"
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack-s3
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559"
+    environment:
+      SERVICES: s3
+      DEBUG: 1
+      AWS_DEFAULT_REGION: us-east-1
+      PERSISTENCE: 1
+    volumes:
+      - ./localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+  
+  aws-cli:
+    image: amazon/aws-cli:latest
+    container_name: aws-cli-setup
+    depends_on:
+      localstack:
+        condition: service_started
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo 'Aguardando LocalStack iniciar...'
+        sleep 5
+        echo 'Criando bucket S3...'
+        aws --endpoint-url=http://localstack:4566 s3 mb s3://kafka-messages 2>/dev/null || echo 'Bucket ja existe'
+        echo 'Buckets disponiveis:'
+        aws --endpoint-url=http://localstack:4566 s3 ls
+        echo 'Setup S3 completo!'
+    restart: "no"
